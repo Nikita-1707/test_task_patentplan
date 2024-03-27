@@ -137,8 +137,8 @@ def test_parse_page_with_http_404_retries(
     with pytest.raises(SiteNotFound404, match='Site https://zakupki.gov.ru/epz return HTTP 404'):
         parse_page_task.run()
 
-    assert m_request_mocker.call_count == 3
-    assert m_sleep.call_count == 3
+    assert m_request_mocker.call_count == 10
+    assert m_sleep.call_count == 10
 
 
 def test_parse_print_xml_run_with_http_404_retries(
@@ -158,5 +158,5 @@ def test_parse_print_xml_run_with_http_404_retries(
     with pytest.raises(SiteNotFound404, match=f'Site {f_url} return HTTP 404'):
         parse_print_xml_task.run()
 
-    assert m_request_mocker.call_count == 3
-    assert m_sleep.call_count == 3
+    assert m_request_mocker.call_count == 10
+    assert m_sleep.call_count == 10

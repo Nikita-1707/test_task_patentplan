@@ -30,7 +30,7 @@ To start the program, set-up redis, celery and execute the main.py:
 ```bash
 python3 main.py
 ```
-Or, you can use docker-compose up to bring up a Docker container:
+Or, you can use Docker:
 
 ```bash
 docker-compose up

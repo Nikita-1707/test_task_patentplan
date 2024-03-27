@@ -18,14 +18,18 @@ class SiteNotFound404(Exception):
     ...
 
 
-REG_NUMBER_PATTER = r'regNumber=(\d+)'
-BUTTONS_DIV = 'w-space-nowrap ml-auto registry-entry__header-top__icon'
+REG_NUMBER_PATTERN = r'regNumber=(\d+)'
+BUTTONS_DIV_CLASS = 'w-space-nowrap ml-auto registry-entry__header-top__icon'
+RETRY_COUNT = 10
+RETRY_SLEEP_DURATION = 15
 
 
 class BaseParse(abc.ABC, celery.Task):
 
-    def __init__(self):
+    def __init__(self) -> None:
+        super().__init__()
         self._url = None
+        self.session = requests.Session()
 
     def before_start(self, task_id, args, kwargs) -> None:
         url = kwargs.get('url')
@@ -39,13 +43,13 @@ class BaseParse(abc.ABC, celery.Task):
         raise NotImplementedError
 
     def _get_page_source(self) -> str:
-        for _ in range(3):
-            response = requests.get(self._url)
+        # NOTE(NikitaS): sometimes site returns HTTP 404 for a long time. Fixed with retries
+        for _ in range(RETRY_COUNT):
+            response = self.session.get(self._url)
 
             if response.status_code == 404:
-                log.info('Got 404 on fetching page. Retrying...')
-                # sometimes site are down for a long time
-                sleep(15)
+                log.debug('Got 404 on fetching page. Retrying...')
+                sleep(RETRY_SLEEP_DURATION)
                 continue
 
             return response.text
@@ -62,10 +66,10 @@ class ParsePage(BaseParse):
             'html.parser',
         )
 
-        res = soup.find_all('div', attrs={'class': BUTTONS_DIV})
+        button_divs = soup.find_all('div', attrs={'class': BUTTONS_DIV_CLASS})
 
-        for element in res:
-            reg_number_match = re.search(REG_NUMBER_PATTER, str(element))
+        for element in button_divs:
+            reg_number_match = re.search(REG_NUMBER_PATTERN, str(element))
 
             if not reg_number_match:
                 log.debug(f'regNumber not found in element: {element}')
