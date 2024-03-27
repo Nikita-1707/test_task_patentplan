@@ -1,0 +1,7 @@
+redis==5.0.1
+beautifulsoup4==4.12.3
+xmltodict==0.13.0
+celery==5.3.6
+requests==2.31.0
+requests-mock==1.11.0
+pytest==8.1.1
