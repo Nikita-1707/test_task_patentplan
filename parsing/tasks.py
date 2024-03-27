@@ -4,6 +4,7 @@ from time import sleep
 
 import celery
 import requests
+import xmltodict
 from bs4 import BeautifulSoup
 
 from logger import log
@@ -42,7 +43,7 @@ class BaseParse(abc.ABC, celery.Task):
             response = requests.get(self._url)
 
             if response.status_code == 404:
-                log.warning('Got 404 on fetching page. Retrying...')
+                log.info('Got 404 on fetching page. Retrying...')
                 # sometimes site are down for a long time
                 sleep(15)
                 continue
@@ -83,4 +84,13 @@ class ParsePrintXml(BaseParse):
     name = 'parse_print_xml'
 
     def run(self, *args, **kwargs):
-        ...
+        result = xmltodict.parse(
+            xml_input=self._get_page_source(),
+        )
+
+        for notification_name, data in result.items():
+            publish_dti = data.get('commonInfo', {}).get('publishDTInEIS')
+            print(
+                f'Notification name: {notification_name}'
+                f'\tpublishDTInEIS:{publish_dti}'
+            )
