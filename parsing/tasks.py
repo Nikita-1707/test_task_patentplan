@@ -1,9 +1,10 @@
+import abc
 import re
 from time import sleep
 
 import celery
 import requests
-from bs4 import BeautifulSoup, ResultSet
+from bs4 import BeautifulSoup
 
 from logger import log
 
@@ -12,9 +13,15 @@ class ValidationError(Exception):
     ...
 
 
-class ParsePage(celery.Task):
-    name = 'parse_page'
-    _reg_number_patter = r'regNumber=(\d+)'
+class SiteNotFound404(Exception):
+    ...
+
+
+REG_NUMBER_PATTER = r'regNumber=(\d+)'
+BUTTONS_DIV = 'w-space-nowrap ml-auto registry-entry__header-top__icon'
+
+
+class BaseParse(abc.ABC, celery.Task):
 
     def __init__(self):
         self._url = None
@@ -28,37 +35,52 @@ class ParsePage(celery.Task):
         self._url = url
 
     def run(self, *args, **kwargs):
+        raise NotImplementedError
+
+    def _get_page_source(self) -> str:
+        for _ in range(3):
+            response = requests.get(self._url)
+
+            if response.status_code == 404:
+                log.warning('Got 404 on fetching page. Retrying...')
+                # sometimes site are down for a long time
+                sleep(15)
+                continue
+
+            return response.text
+
+        raise SiteNotFound404(f'Site {self._url} return HTTP 404')
+
+
+class ParsePage(BaseParse):
+    name = 'parse_page'
+
+    def run(self, *args, **kwargs):
         soup = BeautifulSoup(
-            self._page_source,
+            self._get_page_source(),
             'html.parser',
         )
 
-        div_buttons = 'w-space-nowrap ml-auto registry-entry__header-top__icon'
-
-        res: ResultSet = soup.find_all('div', attrs={'class': div_buttons})
+        res = soup.find_all('div', attrs={'class': BUTTONS_DIV})
 
         for element in res:
-            reg_number_match = re.match(self._reg_number_patter, str(element))
+            reg_number_match = re.search(REG_NUMBER_PATTER, str(element))
 
             if not reg_number_match:
-                raise
+                log.debug(f'regNumber not found in element: {element}')
+                continue
 
-            reg_number = reg_number_match.group()
-            print(reg_number)
+            reg_number = reg_number_match.group(1)
+            print_xml_url = f'https://zakupki.gov.ru/epz/order/notice/printForm/viewXml.html?regNumber={reg_number}'
+            ParsePrintXml().apply_async(
+                kwargs={
+                    'url': print_xml_url,
+                },
+            )
 
-            # reg_numbers = set(re.findall(self._reg_number_patter, res))
-        # print(reg_numbers)
 
-    @property
-    def _page_source(self) -> str:
-        log.warning(self._url)
-        response = requests.get(self._url)
+class ParsePrintXml(BaseParse):
+    name = 'parse_print_xml'
 
-        # one time retry
-        if response.status_code == 404:
-            log.warning('Got 404 on fetching page. Retrying...')
-            # sometimes site are down for a long time
-            sleep(15)
-            response = requests.get(self._url)
-
-        return response.text
+    def run(self, *args, **kwargs):
+        ...
