@@ -95,6 +95,5 @@ class ParsePrintXml(BaseParse):
         for notification_name, data in result.items():
             publish_dti = data.get('commonInfo', {}).get('publishDTInEIS')
             print(
-                f'Notification name: {notification_name}'
-                f'\tpublishDTInEIS:{publish_dti}'
+                f'"{self._url}"-"{publish_dti}"'
             )
